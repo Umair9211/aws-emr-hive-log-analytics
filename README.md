@@ -62,11 +62,9 @@ Advertising Click Logs ────────┘
 
 The source logs reside in Amazon S3. Hive queries run on Amazon EMR, and the joined dataset is stored in an S3 output location.
 
-> **Architecture diagram:** Add your own architecture diagram to `architecture/architecture-diagram.png` and embed it below if you create one.
->
-> ```markdown
-> ![AWS EMR Hive Log Analytics Architecture](architecture/architecture-diagram.png)
-> ```
+ ```markdown
+ ![AWS EMR Hive Log Analytics Architecture](architecture/architecture-diagram.png)
+ ```
 
 ## Technologies Used
 
