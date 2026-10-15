@@ -2,137 +2,148 @@
 
 ## Project Overview
 
-This project demonstrates how to process and analyze large-scale advertising log data using **Amazon EMR, Apache Hive, and Amazon S3**.
+This project demonstrates how to process large-scale advertising log data using **Amazon EMR, Apache Hadoop, Apache Hive, and Amazon S3**.
 
-The project focuses on combining advertising impression logs with click logs to identify which advertisements received the most clicks and which referring websites generated the most engagement.
+The project focuses on analyzing online advertising activity by combining two types of log data:
 
-Apache Hive is used to create external tables, discover data partitions, transform records, join datasets, and execute analytical queries on data stored in Amazon S3.
+- **Impression logs:** Records of advertisements displayed to users.
+- **Click logs:** Records of users clicking on advertisements.
+
+Using Hive, the two datasets are processed and joined to identify which impressions resulted in clicks. The resulting dataset is stored in Amazon S3 and queried to identify the most-clicked advertisements and the websites generating the most ad clicks.
 
 ## Objectives
 
-- Launch an Amazon EMR cluster with Hadoop and Hive.
-- Create Hive external tables referencing JSON log data in Amazon S3.
-- Discover and register existing data partitions.
-- Transform advertising logs using HiveQL.
-- Join impression and click records to identify successful ad interactions.
-- Analyze the most-clicked advertisements and top referring websites.
-- Store the processed dataset in Amazon S3 for subsequent analysis.
+- Launch and configure an Amazon EMR cluster with Hadoop and Hive.
+- Create external Hive tables referencing data stored in Amazon S3.
+- Discover and manage table partitions.
+- Process log data using HiveQL.
+- Join impression and click datasets using a `LEFT OUTER JOIN`.
+- Store the processed dataset in Amazon S3.
+- Analyze advertising clicks and identify the most effective referring websites.
 
 ## Architecture
 
-The project follows this data processing workflow:
+The workflow uses Amazon S3 for source and output storage, Amazon EMR for distributed processing, and Apache Hive for querying and analysis.
 
 ```text
-Advertising Impression Logs ──┐
-                               │
-                               ▼
-                         Amazon S3
-                               ▲
-                               │
-Advertising Click Logs ────────┘
-                               │
-                               ▼
-                         Amazon EMR
-                      (Hadoop + Hive)
-                               │
-                               ▼
-                      External Hive Tables
-                    (Impressions and Clicks)
-                               │
-                               ▼
-                     Data Transformation
-                      and Preparation
-                               │
-                               ▼
-                      LEFT OUTER JOIN
-                               │
-                               ▼
-                    Joined Advertising Data
-                               │
-                               ▼
-                         Amazon S3
-                               │
-                               ▼
-                       HiveQL Analytics
-                               │
-                 ┌─────────────┴─────────────┐
-                 ▼                           ▼
-          Most-Clicked Ads            Top Referrers
+       Advertising Impression Logs
+                    |
+                    |
+                    v
+              Amazon S3
+                    ^
+                    |
+       Advertising Click Logs
+                    |
+                    v
+          Amazon EMR Cluster
+          (Hadoop and Hive)
+                    |
+                    v
+          Apache Hive Processing
+                    |
+          +---------+---------+
+          |                   |
+          v                   v
+   Impressions Table     Clicks Table
+          |                   |
+          +---------+---------+
+                    |
+                    v
+             LEFT OUTER JOIN
+                    |
+                    v
+         Joined Impressions Table
+                    |
+                    v
+             Amazon S3 Output
+                    |
+                    v
+          Hive Analytical Queries
+                    |
+          +---------+----------+
+          |                    |
+          v                    v
+     Most-Clicked Ads    Top Referrers
 ```
 
-The source logs reside in Amazon S3. Hive queries run on Amazon EMR, and the joined dataset is stored in an S3 output location.
-
- ```markdown
- ![AWS EMR Hive Log Analytics Architecture](architecture/architecture-diagram.png)
- ```
+> **Note:** This is a conceptual representation of the processing workflow. The source log data is provided by the lab environment.
 
 ## Technologies Used
 
 | Technology | Purpose |
 |---|---|
-| Amazon EMR | Provides the distributed processing environment. |
-| Apache Hadoop | Supports distributed data processing and cluster resource management. |
+| Amazon EMR | Provides a managed environment for distributed data processing. |
+| Apache Hadoop | Supports distributed processing across cluster nodes. |
 | Apache Hive | Enables SQL-like querying and transformation of log data. |
-| Amazon S3 | Stores source logs and the processed output dataset. |
-| HiveQL | Defines tables, discovers partitions, joins datasets, and performs analysis. |
-| HDFS | Stores intermediate data in temporary Hive tables during processing. |
-| JSON SerDe | Enables Hive to interpret the source JSON log records. |
-| SequenceFile | Stores intermediate and joined data in a Hadoop-native format. |
+| Amazon S3 | Stores the source logs and processed output data. |
+| HiveQL | Defines tables, transforms records, joins datasets, and performs analysis. |
+| HDFS | Stores intermediate data used during processing. |
+| YARN | Coordinates and schedules distributed processing jobs. |
+| AWS Management Console | Used to configure and manage AWS resources. |
+| Linux Terminal / SSH | Used to connect to the EMR primary node and execute Hive commands. |
 
 ## Dataset
 
-The project uses two types of advertising logs.
+The lab provides advertising log data stored in Amazon S3.
 
 ### 1. Impression Logs
 
-Impression logs represent advertisements displayed to users.
+The impressions dataset records advertisements displayed to users.
 
-The `impressions` table extracts the following fields:
+The Hive table references these fields:
 
-- `requestBeginTime`
-- `adId`
-- `impressionId`
-- `referrer`
-- `userAgent`
-- `userCookie`
-- `ip`
-
-The table is partitioned by `dt`, representing the date and time associated with the source log partitions.
+| Column | Description |
+|---|---|
+| `requestBeginTime` | Timestamp associated with the request. |
+| `adId` | Identifier of the advertisement. |
+| `impressionId` | Identifier used to associate an impression with a click. |
+| `referrer` | Website that referred the visitor. |
+| `userAgent` | Browser or client information. |
+| `userCookie` | User cookie identifier. |
+| `ip` | IP address recorded in the log. |
+| `dt` | Partition column representing the log date and time. |
 
 ### 2. Click Logs
 
-Click logs record advertising interactions.
+The clicks dataset records advertisement clicks.
 
-The `clicks` table extracts:
+| Column | Description |
+|---|---|
+| `impressionId` | Identifier used to match a click to an impression. |
+| `adId` | Identifier of the advertisement. |
+| `dt` | Partition column representing the log date and time. |
 
-- `impressionId`
-- `adId`
-
-This table is also partitioned by `dt`.
-
-The `impressionId` field connects click events to the corresponding advertisement impressions.
+The `impressionId` field is used to associate click events with their corresponding impressions.
 
 ## Implementation
 
 ### 1. Launch the Amazon EMR Cluster
 
-Launch an EMR cluster with Hadoop and Hive installed.
+Created an EMR cluster configured with Hadoop and Hive using the AWS Management Console.
 
-The lab uses a historical EMR configuration with Hadoop 2.8.5 and Hive 2.3.6.
+The lab environment uses an older EMR release and specific instance configurations. These settings are documented as part of the lab exercise rather than as a recommendation for new production deployments.
 
-The cluster provides the environment required to execute Hive queries and process the advertising logs.
+### 2. Connect to the Cluster
 
-### 2. Create External Hive Tables
+Connected to the EMR primary node through SSH using the lab-provided environment and launched the Hive command-line interface.
 
-Create the `impressions` and `clicks` external tables.
+Hive commands were used to define tables and process the advertising logs.
 
-These tables reference existing JSON data in Amazon S3 rather than copying the original source files into HDFS.
+### 3. Create External Hive Tables
 
-Hive uses the JSON SerDe to interpret the source records.
+Created two external tables:
 
-### 3. Discover Data Partitions
+- `impressions`
+- `clicks`
 
-Run `MSCK REPAIR TABLE` to discover existing Hive-compatible partitions in Amazon S3 and register them in Hive metadata.
+Both tables reference existing JSON log data in Amazon S3.
+
+The external table definitions specify the fields required for the analysis without copying the original datasets into HDFS.
+
+### 4. Discover Table Partitions
+
+Used Hive's partition repair command to discover the existing partitions in Amazon S3 and update the Hive metastore.
 
 ```sql
 SET hive.msck.path.validation=ignore;
@@ -142,34 +153,28 @@ MSCK REPAIR TABLE impressions;
 MSCK REPAIR TABLE clicks;
 ```
 
-Partitioning allows Hive to organize records by time and restrict queries to relevant data partitions when appropriate.
+The lab's impressions dataset contains 241 partitions after partition discovery.
 
-### 4. Prepare the Data
+Partitioning allows Hive to organize data by time and helps limit processing to relevant portions of the dataset when queries use partition filters.
 
-Create temporary tables named `tmp_impressions` and `tmp_clicks`.
+### 5. Prepare Intermediate Datasets
 
-Use `INSERT OVERWRITE` queries to prepare the records for the selected time interval.
+Created two temporary Hive tables:
 
-The impression preparation query converts the millisecond timestamp into a readable timestamp:
+- `tmp_impressions`
+- `tmp_clicks`
 
-```sql
-FROM_UNIXTIME(
-    CAST(
-        (CAST(requestBeginTime AS BIGINT) / 1000)
-        AS INT
-    )
-)
-```
+The intermediate tables use the SequenceFile format and store data in HDFS.
 
-The click preparation query includes an additional 20-minute window beyond the impression interval to account for clicks occurring after an advertisement is displayed.
+The impressions query converts the request timestamp from milliseconds to a readable timestamp and selects records from the specified time interval.
 
-The temporary tables use SequenceFile storage.
+The clicks query selects the corresponding click records. Its time window extends 20 minutes beyond the impressions interval to account for clicks occurring after an advertisement is displayed.
 
-### 5. Join Impressions and Clicks
+### 6. Join Impressions and Clicks
 
-Create the `joined_impressions` external table in the S3 output location.
+Created the `joined_impressions` external table to store the combined dataset in Amazon S3.
 
-Use a `LEFT OUTER JOIN` on `impressionId` to preserve all selected impression records, including those without matching clicks.
+A `LEFT OUTER JOIN` matches impressions and clicks using `impressionId`.
 
 ```sql
 INSERT OVERWRITE TABLE joined_impressions
@@ -191,24 +196,28 @@ LEFT OUTER JOIN tmp_clicks c
     ON i.impressionId = c.impressionId;
 ```
 
-The resulting dataset includes a Boolean `clicked` field:
+The resulting `clicked` field indicates whether a matching click was found:
 
-- `TRUE`: A matching click record was found.
-- `FALSE`: No matching click record was found.
+- `TRUE`: A matching click exists.
+- `FALSE`: No matching click was found.
 
-The output table is partitioned by `day` and `hour`.
+The left outer join preserves the impression records even when no matching click exists.
 
-### 6. Analyze the Joined Dataset
+The output table is partitioned by `day` and `hour` and stored in Amazon S3 using SequenceFile format.
 
-After processing the logs, use HiveQL to investigate advertising performance.
+### 7. Analyze the Joined Dataset
 
-#### Preview the processed records
+After the join, Hive queries can be used to examine the combined records and identify advertising trends.
+
+#### Preview the processed data
 
 ```sql
 SELECT *
 FROM joined_impressions
 LIMIT 10;
 ```
+
+This query returns a sample of the joined dataset for inspection.
 
 #### Identify the most-clicked advertisements
 
@@ -223,7 +232,7 @@ ORDER BY hits DESC
 LIMIT 10;
 ```
 
-This query identifies advertisements with the highest number of matching click records in the processed dataset.
+This query counts clicked impression records for each advertisement and returns the ten advertisements with the highest counts.
 
 #### Identify the top referring websites
 
@@ -238,7 +247,7 @@ ORDER BY hits DESC
 LIMIT 10;
 ```
 
-This query identifies referring websites associated with the highest number of clicks.
+This query identifies the referring websites associated with the highest numbers of clicked impressions.
 
 ## Repository Structure
 
@@ -265,58 +274,33 @@ aws-emr-hive-log-analytics/
     └── 09-output-data-in-s3.png
 ```
 
-Only include files and screenshots that you have actually created. The architecture diagram is optional until you create your own.
+**Repository contents:**
 
-## Screenshots
+- `README.md`: Project documentation, architecture, workflow, and analytical queries.
+- `queries/hive_queries.hql`: HiveQL statements used throughout the processing workflow.
+- `architecture/architecture-diagram.png`: Architecture diagram created for this project.
+- `screenshots/`: Screenshots documenting the implementation and results.
 
-Screenshots can be added here to document the implementation and results.
+Only include files and screenshots that you have actually created or captured. If you have not created the architecture diagram yet, you can remove its reference from the repository structure until it is ready.
 
-### EMR Cluster
-
-![EMR Cluster](screenshots/02-emr-cluster-running.png)
-
-### Hive Table Creation
-
-![Impressions Table](screenshots/03-hive-impressions-table.png)
-
-![Clicks Table](screenshots/04-hive-clicks-table.png)
-
-### Joined Dataset
-
-![Joined Impressions](screenshots/06-joined-impressions-table.png)
-
-### Advertising Analysis
-
-![Ad Click Analysis](screenshots/07-ad-click-analysis.png)
-
-![Top Referrers](screenshots/08-top-referrers-analysis.png)
-
-### S3 Output
-
-![S3 Output](screenshots/09-output-data-in-s3.png)
-
-> Remove or comment out any image reference until the corresponding screenshot exists in your repository. Otherwise, GitHub will display a broken image.
-
-## Key Learnings
-
-This project demonstrates practical exposure to:
+## Key Concepts Demonstrated
 
 - Distributed data processing with Amazon EMR and Hadoop.
-- Querying large datasets using Apache Hive and HiveQL.
-- Creating external tables over data stored in Amazon S3.
-- Discovering and managing Hive table partitions.
-- Transforming JSON log records into structured datasets.
-- Using temporary tables to prepare data for further processing.
-- Joining datasets using a shared identifier.
-- Using Boolean flags to identify records with matching click events.
-- Storing processed data in Amazon S3.
-- Performing analytical queries to identify advertising engagement trends.
+- SQL-like data processing using Apache Hive.
+- External Hive tables referencing Amazon S3 data.
+- Partition discovery and metadata management.
+- Intermediate data processing using HDFS.
+- Timestamp conversion and time-window filtering.
+- Joining datasets using a common identifier.
+- Writing partitioned output data to Amazon S3.
+- Aggregation and ranking using HiveQL.
+- Analysis of advertising engagement and referral sources.
 
 ## Project Context
 
 This project is based on an AWS Academy lab focused on processing logs with Amazon EMR.
 
-The repository documents the architecture, Hive queries, and implementation evidence relevant to the project. It is intended as a learning and portfolio project rather than a production-ready advertising analytics platform.
+The lab provides the source data and a guided environment for implementing the workflow. The repository documents the technical concepts, queries, architecture, and implementation evidence associated with the exercise.
 
 ## Author
 
