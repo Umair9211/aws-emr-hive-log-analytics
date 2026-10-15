@@ -69,6 +69,7 @@ The workflow uses Amazon S3 for source and output storage, Amazon EMR for distri
 
 > **Note:** This is a conceptual representation of the processing workflow. The source log data is provided by the lab environment.
 
+![AWS ETL Architecture](architecture/architecture-diagram.png)
 ## Technologies Used
 
 | Technology | Purpose |
